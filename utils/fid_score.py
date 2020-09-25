@@ -19,11 +19,13 @@ See --help to see further details.
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from imageio import imread
 from scipy import linalg
 import pathlib
 import warnings
+
+tf.disable_v2_behavior()
 
 
 class InvalidFIDException(Exception):
@@ -34,6 +36,7 @@ def create_inception_graph(pth):
     """Creates a graph from saved GraphDef file."""
     # Creates graph from saved graph_def.pb.
     with tf.gfile.FastGFile(pth, 'rb') as f:
+        # graph_def = tf.GraphDef()
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
         _ = tf.import_graph_def(graph_def, name='FID_Inception_Net')
@@ -67,7 +70,7 @@ def _get_inception_layer(sess):
 # -------------------------------------------------------------------------------
 
 
-def get_activations(images, sess, batch_size=50, verbose=False):
+def get_activations(images, sess, batch_size=50, verbose=True):
     """Calculates the activations of the pool_3 layer for all images.
 
     Params:
@@ -163,7 +166,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 # -------------------------------------------------------------------------------
 
 
-def calculate_activation_statistics(images, sess, batch_size=50, verbose=False):
+def calculate_activation_statistics(images, sess, batch_size=50, verbose=True):
     """Calculation of the statistics used by the FID.
     Params:
     -- images      : Numpy array of dimension (n_images, hi, wi, 3). The values
@@ -202,7 +205,7 @@ def load_image_batch(files):
     return np.array([imread(str(fn)).astype(np.float32) for fn in files])
 
 
-def get_activations_from_files(files, sess, batch_size=50, verbose=False):
+def get_activations_from_files(files, sess, batch_size=50, verbose=True):
     """Calculates the activations of the pool_3 layer for all images.
 
     Params:
@@ -225,8 +228,8 @@ def get_activations_from_files(files, sess, batch_size=50, verbose=False):
     n_used_imgs = n_batches * batch_size
     pred_arr = np.empty((n_used_imgs, 2048))
     for i in range(n_batches):
-        if verbose:
-            print("\rPropagating batch %d/%d" % (i + 1, n_batches), end="", flush=True)
+        # if verbose:
+        print("\rPropagating batch %d/%d" % (i + 1, n_batches), end="", flush=True)
         start = i * batch_size
         end = start + batch_size
         batch = load_image_batch(files[start:end])
@@ -238,7 +241,7 @@ def get_activations_from_files(files, sess, batch_size=50, verbose=False):
     return pred_arr
 
 
-def calculate_activation_statistics_from_files(files, sess, batch_size=50, verbose=False):
+def calculate_activation_statistics_from_files(files, sess, batch_size=50, verbose=True):
     """Calculation of the statistics used by the FID.
     Params:
     -- files      : list of paths to image files. Images need to have same dimensions for all files.

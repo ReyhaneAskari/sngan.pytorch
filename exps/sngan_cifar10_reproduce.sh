@@ -20,5 +20,5 @@ python train.py \
 --init_type xavier_uniform \
 --n_critic 5 \
 --val_freq 32 \
---exp_name sngan_cifar10 \
+--exp_name sngan_cifar10_reproduce \
 --num_eval_imgs 5000

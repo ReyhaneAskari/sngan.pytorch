@@ -38,8 +38,8 @@ def main():
     create_inception_graph(inception_path)
 
     # import network
-    gen_net = eval('models.'+args.model+'.Generator')(args=args).cuda()
-    dis_net = eval('models.'+args.model+'.Discriminator')(args=args).cuda()
+    gen_net = eval('models.' + args.model + '.Generator')(args=args).cuda()
+    dis_net = eval('models.' + args.model + '.Discriminator')(args=args).cuda()
 
     # weight init
     def weights_init(m):
@@ -79,6 +79,7 @@ def main():
         fid_stat = 'fid_stat/stl10_train_unlabeled_fid_stats_48.npz'
     else:
         raise NotImplementedError(f'no fid stat for {args.dataset.lower()}')
+
     assert os.path.exists(fid_stat)
 
     # epoch number for dis_net
@@ -132,7 +133,7 @@ def main():
         train(args, gen_net, dis_net, gen_optimizer, dis_optimizer, gen_avg_param, train_loader, epoch, writer_dict,
               lr_schedulers)
 
-        if epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch)-1:
+        if epoch and epoch % args.val_freq == 0 or epoch == int(args.max_epoch) - 1:
             backup_param = copy_params(gen_net)
             load_params(gen_net, gen_avg_param)
             inception_score, fid_score = validate(args, fixed_z, fid_stat, gen_net, writer_dict)
