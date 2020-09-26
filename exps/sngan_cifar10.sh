@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 export CUDA_VISIBLE_DEVICES=0
 python train.py \
 -gen_bs 128 \
@@ -18,7 +17,8 @@ python train.py \
 --beta1 0.0 \
 --beta2 0.9 \
 --init_type xavier_uniform \
---n_critic 5 \
---val_freq 32 \
+--n_critic 1 \
+--val_freq 1 \
 --exp_name sngan_cifar10 \
---num_eval_imgs 5000
+--num_eval_imgs 1000 \
+--optimizer sLead_Adam

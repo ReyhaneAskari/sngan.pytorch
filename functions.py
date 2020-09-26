@@ -16,7 +16,8 @@ import logging
 
 from utils.inception_score import get_inception_score
 from utils.fid_score import calculate_fid_given_paths
-
+from torch.nn.utils import parameters_to_vector
+from utils.optim import parameters_grad_to_vector
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,20 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
     gen_net = gen_net.train()
     dis_net = dis_net.train()
 
+    dis_params_flatten = parameters_to_vector(dis_net.parameters())
+    gen_params_flatten = parameters_to_vector(gen_net.parameters())
+
+    if args.optimizer == 'sLead_Adam':
+        # just to fill-up the grad buffers
+        imgs = iter(train_loader).__next__()[0]
+        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (imgs.shape[0], args.latent_dim)))
+        fake_imgs = gen_net(z)
+        fake_validity = dis_net(fake_imgs)
+        d_loss = torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
+        g_loss = -torch.mean(fake_validity)
+        (0.0 * d_loss).backward(create_graph=True)
+        (0.0 * g_loss).backward(create_graph=True)
+
     for iter_idx, (imgs, _) in enumerate(tqdm(train_loader)):
         global_steps = writer_dict['train_global_steps']
 
@@ -42,19 +57,34 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        dis_optimizer.zero_grad()
-
         real_validity = dis_net(real_imgs)
-        fake_imgs = gen_net(z).detach()
+        fake_imgs = gen_net(z)
         assert fake_imgs.size() == real_imgs.size()
-
         fake_validity = dis_net(fake_imgs)
 
         # cal loss
-        d_loss = torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
-                 torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
-        d_loss.backward()
-        dis_optimizer.step()
+        d_loss = torch.mean(
+            nn.ReLU(inplace=True)(1.0 - real_validity)) + torch.mean(
+            nn.ReLU(inplace=True)(1 + fake_validity))
+
+        if args.optimizer == 'Adam':
+            dis_optimizer.zero_grad()
+            d_loss.backward()
+            dis_optimizer.step()
+        elif args.optimizer == 'sLead_Adam':
+            gradsD = torch.autograd.grad(
+                outputs=d_loss, inputs=(dis_net.parameters()),
+                create_graph=True)
+            for p, g in zip(dis_net.parameters(), gradsD):
+                p.grad = g
+            gen_params_flatten_prev = gen_params_flatten + 0.0
+            gen_params_flatten = parameters_to_vector(gen_net.parameters()) + 0.0
+            grad_gen_params_flatten = parameters_grad_to_vector(gen_net.parameters())
+            delta_gen_params_flatten = gen_params_flatten - gen_params_flatten_prev
+            vjp_dis = torch.autograd.grad(
+                grad_gen_params_flatten, dis_net.parameters(),
+                grad_outputs=delta_gen_params_flatten)
+            dis_optimizer.step(vjps=vjp_dis)
 
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
 
@@ -62,16 +92,33 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         #  Train Generator
         # -----------------
         if global_steps % args.n_critic == 0:
-            gen_optimizer.zero_grad()
-
+            # cal loss
             gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.latent_dim)))
             gen_imgs = gen_net(gen_z)
             fake_validity = dis_net(gen_imgs)
-
-            # cal loss
             g_loss = -torch.mean(fake_validity)
-            g_loss.backward()
-            gen_optimizer.step()
+
+            if args.optimizer == 'Adam':
+                gen_optimizer.zero_grad()
+                g_loss.backward()
+                gen_optimizer.step()
+
+            elif args.optimizer == 'sLead_Adam':
+                gradsG = torch.autograd.grad(
+                    outputs=g_loss, inputs=(gen_net.parameters()),
+                    create_graph=True)
+                for p, g in zip(gen_net.parameters(), gradsG):
+                    p.grad = g
+
+                dis_params_flatten_prev = dis_params_flatten + 0.0
+                dis_params_flatten = parameters_to_vector(dis_net.parameters()) + 0.0
+                grad_dis_params_flatten = parameters_grad_to_vector(dis_net.parameters())
+                delta_dis_params_flatten = dis_params_flatten - dis_params_flatten_prev
+                vjp_gen = torch.autograd.grad(
+                    grad_dis_params_flatten, gen_net.parameters(),
+                    grad_outputs=delta_dis_params_flatten)
+
+                gen_optimizer.step(vjps=vjp_gen)
 
             # adjust learning rate
             if schedulers:

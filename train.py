@@ -23,6 +23,7 @@ import torch.nn as nn
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from copy import deepcopy
+from utils.optim import sLead_Adam
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -61,10 +62,16 @@ def main():
     dis_net.apply(weights_init)
 
     # set optimizer
-    gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
-                                     args.g_lr, (args.beta1, args.beta2))
-    dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
-                                     args.d_lr, (args.beta1, args.beta2))
+    if args.optimizer == 'Adam':
+        dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
+                                         args.d_lr, (args.beta1, args.beta2))
+        gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
+                                         args.g_lr, (args.beta1, args.beta2))
+    elif args.optimizer == 'sLead_Adam':
+        dis_optimizer = sLead_Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
+                                   args.d_lr, (args.beta1, args.beta2), args.alpha_vjp_d)
+        gen_optimizer = sLead_Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
+                                   args.g_lr, (args.beta1, args.beta2), args.alpha_vjp_g)
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
     dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 

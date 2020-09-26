@@ -127,6 +127,22 @@ def parse_args():
         type=str,
         default='./data',
         help='The path of data set')
+    parser.add_argument(
+        '--optimizer',
+        type=str,
+        default='Adam',
+        help='Adam vs sLead_Adam')
+    parser.add_argument(
+        '--alpha_vjp_d',
+        type=float,
+        default=0.0,
+        help='The coefficient of second order term in sLead_Adam for d')
+    parser.add_argument(
+        '--alpha_vjp_g',
+        type=float,
+        default=0.0,
+        help='The coefficient of second order term in sLead_Adam for g')
+
     parser.add_argument('--init_type', type=str, default='normal',
                         choices=['normal', 'orth', 'xavier_uniform', 'false'],
                         help='The init type')
