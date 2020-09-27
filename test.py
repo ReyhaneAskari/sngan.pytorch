@@ -15,6 +15,8 @@ from utils.utils import set_log_dir, create_logger
 from utils.inception_score import _init_inception
 from utils.fid_score import create_inception_graph, check_or_download_inception
 from utils.fid_score_pytorch import calculate_fid
+from utils.inception_score import get_inception_score
+
 import torch.nn as nn
 
 import torch
@@ -23,23 +25,42 @@ import numpy as np
 from tensorboardX import SummaryWriter
 from itertools import chain
 import datasets
+from pathlib import Path
+from torchvision.utils import make_grid
+from imageio import imsave
+from tqdm import tqdm
+
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 
 
 def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict):
-    # writer = writer_dict['writer']
-    # global_steps = writer_dict['valid_global_steps']
-
-    # eval mode
-
     dataset = datasets.ImageDataset(args)
     train_loader = dataset.train
     gen_net = gen_net.eval()
-
-    sample_list = []
+    global_steps = writer_dict['valid_global_steps']
     eval_iter = args.num_eval_imgs // args.eval_batch_size
+    # compute IS
+    IS_buffer_dir = os.path.join(args.path_helper['sample_path'], 'fid_buffer')
+    os.makedirs(IS_buffer_dir)
+    img_list = list()
+    for iter_idx in tqdm(range(eval_iter), desc='sample images'):
+        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_batch_size, args.latent_dim)))
+
+        # Generate a batch of images
+        gen_imgs = gen_net(z).mul_(127.5).add_(127.5).clamp_(0.0, 255.0).permute(0, 2, 3, 1).to('cpu', torch.uint8).numpy()
+        for img_idx, img in enumerate(gen_imgs):
+            file_name = os.path.join(IS_buffer_dir, f'iter{iter_idx}_b{img_idx}.png')
+            imsave(file_name, img)
+        img_list.extend(list(gen_imgs))
+
+    inception_score, std = get_inception_score(img_list)
+    print('------------------------Inception Score------------------------')
+    print(inception_score)
+
+    # compute FID
+    sample_list = []
     for i in range(eval_iter):
         z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_batch_size, args.latent_dim)))
         samples = gen_net(z)
@@ -56,38 +77,22 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict):
             break
     real_image_np = np.concatenate(real_image_np, 0)[:fake_image_np.shape[0]]
     fid_score = calculate_fid(real_image_np, fake_image_np, batch_size=300)
+    var_fid = fid_score[0][2]
+    fid = round(fid_score[0][1], 3)
+    print('------------------------fid_score------------------------')
+    print(fid_score)
 
-    # eval_iter = args.num_eval_imgs // args.eval_batch_size
-    # img_list = list()
-    # for iter_idx in tqdm(range(eval_iter), desc='sample images'):
-    #     z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_batch_size, args.latent_dim)))
+    # Generate a batch of images
+    sample_dir = os.path.join(args.path_helper['sample_path'], 'sample_dir')
+    Path(sample_dir).mkdir(exist_ok=True)
 
-    #     # Generate a batch of images
-    #     gen_imgs = gen_net(z).mul_(127.5).add_(127.5).clamp_(0.0, 255.0).permute(0, 2, 3, 1).to('cpu', torch.uint8).numpy()
-    #     for img_idx, img in enumerate(gen_imgs):
-    #         file_name = os.path.join(fid_buffer_dir, f'iter{iter_idx}_b{img_idx}.png')
-    #         imsave(file_name, img)
-    #     img_list.extend(list(gen_imgs))
+    sample_imgs = gen_net(fixed_z).mul_(127.5).add_(127.5).clamp_(0.0, 255.0)
+    img_grid = make_grid(sample_imgs, nrow=5).to('cpu', torch.uint8).numpy()
+    file_name = os.path.join(sample_dir, f'final_fid_{fid}_inception_score{inception_score}.png')
+    imsave(file_name, img_grid.swapaxes(0, 1).swapaxes(1, 2))
 
-    # # get inception score
-    # logger.info('=> calculate inception score')
-    # mean, std = get_inception_score(img_list)
-
-    # # get fid score
-    # logger.info('=> calculate fid score')
-    # fid_score = calculate_fid_given_paths([fid_buffer_dir, fid_stat], inception_path=None)
-
-    # os.system('rm -r {}'.format(fid_buffer_dir))
-
-    # writer.add_image('sampled_images', img_grid, global_steps)
-    # writer.add_scalar('Inception_score/mean', mean, global_steps)
-    # writer.add_scalar('Inception_score/std', std, global_steps)
-    # writer.add_scalar('FID_score', fid_score, global_steps)
-
-    # writer_dict['valid_global_steps'] = global_steps + 1
-    mean = 0
-
-    return mean, fid_score
+    writer_dict['valid_global_steps'] = global_steps + 1
+    return inception_score, fid
 
 
 def main():

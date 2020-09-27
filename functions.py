@@ -153,26 +153,27 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, train_loa
     global_steps = writer_dict['valid_global_steps']
 
     # compute FID
-    sample_list = []
-    eval_iter = args.num_eval_imgs // args.eval_batch_size
-    for i in range(eval_iter):
-        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_batch_size, args.latent_dim)))
-        samples = gen_net(z)
-        sample_list.append(samples.data.cpu().numpy())
+    # sample_list = []
+    # eval_iter = args.num_eval_imgs // args.eval_batch_size
+    # for i in range(eval_iter):
+    #     z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_batch_size, args.latent_dim)))
+    #     samples = gen_net(z)
+    #     sample_list.append(samples.data.cpu().numpy())
 
-    new_sample_list = list(chain.from_iterable(sample_list))
-    fake_image_np = np.concatenate([img[None] for img in new_sample_list], 0)
+    # new_sample_list = list(chain.from_iterable(sample_list))
+    # fake_image_np = np.concatenate([img[None] for img in new_sample_list], 0)
 
-    real_image_np = []
-    for i, (images, _) in enumerate(train_loader):
-        real_image_np += [images.data.numpy()]
-        batch_size = real_image_np[0].shape[0]
-        if len(real_image_np) * batch_size >= fake_image_np.shape[0]:
-            break
-    real_image_np = np.concatenate(real_image_np, 0)[:fake_image_np.shape[0]]
-    fid_score = calculate_fid(real_image_np, fake_image_np, batch_size=300)
-    var_fid = fid_score[0][2]
-    fid = round(fid_score[0][1], 3)
+    # real_image_np = []
+    # for i, (images, _) in enumerate(train_loader):
+    #     real_image_np += [images.data.numpy()]
+    #     batch_size = real_image_np[0].shape[0]
+    #     if len(real_image_np) * batch_size >= fake_image_np.shape[0]:
+    #         break
+    # real_image_np = np.concatenate(real_image_np, 0)[:fake_image_np.shape[0]]
+    # fid_score = calculate_fid(real_image_np, fake_image_np, batch_size=300)
+    # var_fid = fid_score[0][2]
+    # fid = round(fid_score[0][1], 3)
+    fid_score = 0
     print('------------------------fid_score------------------------')
     print(fid_score)
 
@@ -181,6 +182,7 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, train_loa
     Path(sample_dir).mkdir(exist_ok=True)
 
     sample_imgs = gen_net(fixed_z).mul_(127.5).add_(127.5).clamp_(0.0, 255.0)
+    import ipdb; ipdb.set_trace()
     img_grid = make_grid(sample_imgs, nrow=5).to('cpu', torch.uint8).numpy()
     file_name = os.path.join(sample_dir, f'epoch{epoch}_fid_{fid}.png')
     imsave(file_name, img_grid[0])
