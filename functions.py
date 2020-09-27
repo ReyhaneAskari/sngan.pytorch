@@ -76,19 +76,25 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             d_loss.backward()
             dis_optimizer.step()
         elif args.optimizer == 'sLead_Adam':
-            gradsD = torch.autograd.grad(
-                outputs=d_loss, inputs=(dis_net.parameters()),
-                create_graph=True)
-            for p, g in zip(dis_net.parameters(), gradsD):
-                p.grad = g
-            gen_params_flatten_prev = gen_params_flatten + 0.0
-            gen_params_flatten = parameters_to_vector(gen_net.parameters()) + 0.0
-            grad_gen_params_flatten = parameters_grad_to_vector(gen_net.parameters())
-            delta_gen_params_flatten = gen_params_flatten - gen_params_flatten_prev
-            vjp_dis = torch.autograd.grad(
-                grad_gen_params_flatten, dis_net.parameters(),
-                grad_outputs=delta_gen_params_flatten)
-            dis_optimizer.step(vjps=vjp_dis)
+            if global_steps % args.n_critic == 0:
+                gradsD = torch.autograd.grad(
+                    outputs=d_loss, inputs=(dis_net.parameters()),
+                    create_graph=True)
+                for p, g in zip(dis_net.parameters(), gradsD):
+                    p.grad = g
+                gen_params_flatten_prev = gen_params_flatten + 0.0
+                gen_params_flatten = parameters_to_vector(gen_net.parameters()) + 0.0
+                grad_gen_params_flatten = parameters_grad_to_vector(gen_net.parameters())
+                delta_gen_params_flatten = gen_params_flatten - gen_params_flatten_prev
+                vjp_dis = torch.autograd.grad(
+                    grad_gen_params_flatten, dis_net.parameters(),
+                    grad_outputs=delta_gen_params_flatten)
+                dis_optimizer.step(vjps=vjp_dis)
+            else:
+                # do regular adam
+                dis_optimizer.zero_grad()
+                d_loss.backward()
+                dis_optimizer.step()
 
         writer.add_scalar('d_loss', d_loss.item(), global_steps)
 

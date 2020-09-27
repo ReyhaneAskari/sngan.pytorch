@@ -47,7 +47,7 @@ class sLead_Adam(optim.Optimizer):
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
 
-    def step(self, vjps, closure=None):
+    def step(self, vjps=None, closure=None):
         """Performs a single optimization step.
 
         Arguments:
@@ -60,7 +60,10 @@ class sLead_Adam(optim.Optimizer):
 
         for group in self.param_groups:
             for index, p in enumerate(group['params']):
-                vjp = vjps[index]
+                if vjps:
+                    vjp = vjps[index]
+                else:
+                    vjp = 0.0
                 if p.grad is None:
                     continue
 
