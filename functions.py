@@ -172,18 +172,16 @@ def validate(args, fixed_z, fid_stat, gen_net: nn.Module, writer_dict, train_loa
     real_image_np = np.concatenate(real_image_np, 0)[:fake_image_np.shape[0]]
     fid_score = calculate_fid(real_image_np, fake_image_np, batch_size=300)
     var_fid = fid_score[0][2]
-    fid = fid_score[0][1]
+    fid = round(fid_score[0][1], 3)
     print('------------------------fid_score------------------------')
     print(fid_score)
 
     # Generate a batch of images
     sample_dir = os.path.join(args.path_helper['sample_path'], 'sample_dir')
     Path(sample_dir).mkdir(exist_ok=True)
-    # os.makedirs(sample_dir)
 
-    sample_imgs = gen_net(fixed_z)
-    img_grid = make_grid(
-        sample_imgs, nrow=5, normalize=True, scale_each=True).to('cpu', torch.uint8).numpy()
+    sample_imgs = gen_net(fixed_z).mul_(127.5).add_(127.5).clamp_(0.0, 255.0)
+    img_grid = make_grid(sample_imgs, nrow=5).to('cpu', torch.uint8).numpy()
     file_name = os.path.join(sample_dir, f'epoch{epoch}_fid_{fid}.png')
     imsave(file_name, img_grid[0])
 
