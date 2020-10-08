@@ -10,7 +10,7 @@ import glob
 import argparse
 import numpy as np
 from imageio import imread
-import tensorflow as tf
+# import tensorflow as tf
 
 import utils.fid_score as fid
 
@@ -61,12 +61,12 @@ def main():
     print("ok")
 
     print("calculte FID stats..", end=" ", flush=True)
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    with tf.Session(config=config) as sess:
-        sess.run(tf.global_variables_initializer())
-        mu, sigma = fid.calculate_activation_statistics(images, sess, batch_size=100)
-        np.savez_compressed(output_path, mu=mu, sigma=sigma)
+    # config = tf.ConfigProto()
+    # config.gpu_options.allow_growth = True
+    # with tf.Session(config=config) as sess:
+    #     sess.run(tf.global_variables_initializer())
+    #     mu, sigma = fid.calculate_activation_statistics(images, sess, batch_size=100)
+    #     np.savez_compressed(output_path, mu=mu, sigma=sigma)
     print("finished")
 
 
