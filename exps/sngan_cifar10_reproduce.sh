@@ -63,6 +63,6 @@ python train.py \
 --beta2 0.9 \
 --init_type xavier_uniform \
 --n_critic 1 \
---val_freq 32 \
+--val_freq 1 \
 --exp_name sngan_cifar10_reproduce_1_critic_ \
 --num_eval_imgs 5000

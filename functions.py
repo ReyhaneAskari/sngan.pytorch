@@ -15,8 +15,8 @@ from copy import deepcopy
 import logging
 from itertools import chain
 
-from utils.inception_score import get_inception_score
-from utils.fid_score import calculate_fid_given_paths
+# from utils.inception_score import get_inception_score
+# from utils.fid_score import calculate_fid_given_paths
 from torch.nn.utils import parameters_to_vector
 from utils.optim import parameters_grad_to_vector
 from utils.fid_score_pytorch import calculate_fid
